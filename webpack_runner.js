@@ -1,12 +1,12 @@
 const webpack = require("webpack")
 const path = require("path")
 const fs = require("fs")
-let run = false
 const { CleanWebpackPlugin } = require("clean-webpack-plugin")
 const WatchExternalFilesPlugin = require("webpack-watch-files-plugin").default
 const exec = require("child-process-promise").exec
 const WebpackObfuscator = require("webpack-obfuscator")
 const process = require("process")
+const glob = require("glob")
 
 const ensureArray = (config) =>
     (config && (Array.isArray(config) ? config : [config])) || []
@@ -37,6 +37,7 @@ class SaveStatePlugin {
     constructor(inp) {
         this.cache = []
         this.cachePath = inp.cachePath
+        this.resourcePath = inp.resourcePath
     }
 
     apply(compiler) {
@@ -47,6 +48,18 @@ class SaveStatePlugin {
                     stats: getStat(file),
                 })
             }
+            const rp = this.resourcePath
+            let ca = this.cache
+            glob("src/**/*.go", { cwd: rp }, function (er, files) {
+                for (const p of files) {
+                    let file = path.resolve(rp, p)
+
+                    ca.push({
+                        name: file,
+                        stats: getStat(file),
+                    })
+                }
+            })
         })
 
         compiler.hooks.done.tap("SaveStatePlugin", (stats) => {
@@ -84,8 +97,6 @@ class WatchRunPlugin {
                 this.buildGO().then()
                 if (!this.rcon.autorestart) return
 
-                if (run) return
-                run = true
                 // exec(
                 //     `${path.join(
                 //         __dirname,
